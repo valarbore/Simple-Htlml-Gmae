@@ -75,6 +75,7 @@ function createPlayer(field){
     }
 
     return{
+        // use function to get x's real value after moving
         getx:function () {
             return x
         },
@@ -115,6 +116,12 @@ function createBullet(player,field) {
         isVanish:function () {
             return isVanish
         },
-        updatePosition:updatePosition
+        updatePosition:updatePosition,
+        getx:function () {
+            return x
+        },
+        gety:function () {
+            return y
+        }
     }
 }
