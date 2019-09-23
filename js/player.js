@@ -10,8 +10,14 @@ function createPlayer(field){
     img.style.position = "absolute"
     // initiate player status
     var init = function () {
-        img.style.left = (field.clientWidth/2-14)+"px"
-        img.style.top = maxy+"px"
+        x = field.clientWidth/2-14
+        y = maxy
+        img.style.left = x+"px"
+        img.style.top = y+"px"
+        img.style.display = "block"
+    }
+    var die = function () {
+        img.style.display = "none"
     }
     // 5px every 30ms
     var velocity = 5
@@ -82,6 +88,7 @@ function createPlayer(field){
         gety:function () {
             return y
         },
+        die:die,
         img:img,
         init:init,
         updatePosition:updatePosition,
@@ -90,7 +97,7 @@ function createPlayer(field){
     }
 }
 // bullet is 6px*32px
-function createBullet(player,field) {
+function createBullet(player) {
     var velY = -10
     var x = player.getx()+11
     var y = player.gety()-32
@@ -101,12 +108,11 @@ function createBullet(player,field) {
     img.style.left = x+"px"
     img.style.top = y+"px"
     var updatePosition = function(){
-        var nextY = y+velY
-        if(nextY<=-32){
+        if(y<=-32){
             isVanish = true
         }else {
+            y = velY+y
             img.style.top = y+"px"
-            y = nextY
         }
     }
     return{

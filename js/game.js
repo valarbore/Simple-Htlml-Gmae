@@ -1,16 +1,26 @@
 var intervalId
 var bulletInterval
 var enemyInterval
-
+var enemyBulletInterval
+// enemy 10 point
+// level 0 0-50
+// level 1 50-150
+// level 2 150-300
+// level 3 300-???
 function createGame() {
     var field = document.getElementById("game")
     var player = createPlayer(field)
     field.appendChild(player.img)
     // parameters for different levels
+    var isGameOver = false
+    var bestScore = 0
+    var bestScoreDom = document.getElementById("bestScore")
+    var score = 0
+    var scoreDom = document.getElementById("score")
+    var level = 0
+    var levelDom = document.getElementById("level")
     var levelParam = {
         enemyNum: 5,
-        isEnemyChasing: false,
-        isBulletChasing: false,
         enemyInterval: 1000
 
     }
@@ -29,34 +39,62 @@ function createGame() {
         timerInit()
     }
     var parameterInit = function () {
+        // set bestScore from localStorage
+        console.log(localStorage)
+        var best = localStorage.getItem("bestScore");
+        console.log(best)
+        if (best)
+            bestScore = parseInt(best)
+        else bestScore = 0
+        bestScoreDom.innerText = "BestScore: " + bestScore
+        score = 0
+        scoreDom.innerText = "Score: " + score
+        scoreDom.style.color = 'white'
+        // set game difficulty level
+        level = 0
+        levelDom.innerText = "Level: " + level
         levelParam = {
             enemyNum: 5,
-            isEnemyChasing: false,
-            isBulletChasing: false,
             enemyInterval: 1000
         }
+        // set isGameOver to false
+        isGameOver = false
     }
-
+    var clearTimer = function () {
+        clearInterval(intervalId)
+        clearInterval(bulletInterval)
+        clearInterval(enemyInterval)
+        clearInterval(enemyBulletInterval)
+    }
     var timerInit = function () {
         // interval for game state update
         intervalId = setInterval(function () {
-            // update player's state
-            player.updatePosition()
-            // update player's bullets state
-            updatePlayerBullet()
-            // update enemy's state
-            updateEnemy()
+            if (isGameOver) {
+                if (explodes.length == 0)
+                    clearTimer()
+                //game over
+                document.getElementById("gameOver").style.display = "block"
+                if (score > bestScore)
+                    localStorage.setItem("bestScore", score)
+            } else {
+                // update player's state
+                player.updatePosition()
+                // update player's bullets state
+                updatePlayerBullet()
+                // update enemy's state
+                updateEnemy()
+                // update enemyBullet state
+                updateEnemyBullet()
+            }
             // update explode
             updateExplode()
         }, 30)
         // interval for player launching bullets
-        bulletInterval = setInterval(function () {
-            var bullet = createBullet(player, field)
-            bullets.push(bullet)
-            field.appendChild(bullet.getImg())
-        }, 300)
+        setBulletInterval()
         // interval for enemy emerge
         setEnemyInterval(levelParam.enemyInterval)
+        // interval for enemy bullet
+        setEnemyBulletInterval()
     }
     // update player's bullets' state
     var updatePlayerBullet = function () {
@@ -65,33 +103,11 @@ function createGame() {
             if (value.isVanish()) {
                 temp.push(index)
             } else {
-                var diedEnemy = new Array()
-                // check bullet collide with enemy
-                enemies.forEach(function (value1,index1) {
-                    if (!value1.isVanish()) {
-                        var disX = value.getx() - value1.getx()
-                        var disY = value.gety() - value1.gety()
-                        // detect collision
-                        if (disX > -3 && disX < 35 && disY > -30 && disY < 62) {
-                            // record to delete bullet
-                            temp.push(index)
-                            // record to delete enemy
-                            diedEnemy.push(index1)
-                        }
-                    }
-                })
-                // delete died enemy and create an explode
-                diedEnemy.forEach(function (value1) {
-                    var tempEnemy = enemies[value1]
-                    // create an explode
-                    var explode = createExplode(tempEnemy.getx() + 16, tempEnemy.gety() - 16)
-                    field.appendChild(explode.img)
-                    explodes.push(explode)
-                    // delete died enemy
-                    field.removeChild(enemies[value1].img())
-                    enemies.splice(value1,1)
-                })
-                value.updatePosition()
+                if (checkKillEnemy(value)) {
+                    temp.push(index)
+                } else {
+                    value.updatePosition()
+                }
             }
         })
         // delete the vanished bullets
@@ -100,14 +116,77 @@ function createGame() {
             bullets.splice(value, 1)
         })
     }
+    // check whether the bullet kill the enemy
+    var checkKillEnemy = function (bullet) {
+        var diedEnemy = new Array()
+        // check bullet collide with enemy
+        enemies.forEach(function (value1, index1) {
+            if (!value1.isVanish()) {
+                var disX = bullet.getx() - value1.getx()
+                var disY = bullet.gety() - value1.gety()
+                // detect collision
+                if (disX > -3 && disX < 35 && disY > -30 && disY < 62) {
+                    // record to delete enemy
+                    diedEnemy.push(index1)
+                }
+            }
+        })
+        // delete died enemy and create an explode
+        diedEnemy.forEach(function (value1) {
+            var tempEnemy = enemies[value1]
+            // create an explode
+            createExplodeAtPosition(tempEnemy.getx() + 16, tempEnemy.gety() + 16)
+            //add score
+            addScore()
+            // delete died enemy
+            field.removeChild(enemies[value1].img())
+            enemies.splice(value1, 1)
+        })
+        if (diedEnemy.length > 0) return true
+        return false
+    }
+    // add score
+    // enemy 10 point
+    // level 0 0-50
+    // level 1 50-150
+    // level 2 150-300
+    // level 3 300-???
+    var addScore = function () {
+        score += 10
+        scoreDom.innerText = "Score: " + score
+        // set game difficulty level
+        if (score <= 50) {
+            level = 0
+        } else if (score > 50 && score <= 150) {
+            level = 1
+        } else if (score > 150 && score <= 300) {
+            level = 2
+            levelParam.enemyNum = 10
+            levelParam.enemyInterval = 500
+            clearInterval(enemyInterval)
+            setEnemyInterval(levelParam.enemyInterval)
+        } else {
+            level = 3
+        }
+        levelDom.innerText = "Level: " + level
+        // update bestScore
+        if (score > bestScore) {
+            scoreDom.style.color = 'red'
+            // todo bestScore
+        }
+    }
     // update living enemy state
     var updateEnemy = function () {
         var temp = new Array()
         enemies.forEach(function (value, index) {
-           if (value.isVanish()) {
+            if (value.isVanish()) {
                 temp.push(index)
             } else {
-                value.updatePosition()
+                if (checkEnemyCollideWithPlayer(value)) {
+                    temp.push(index)
+                } else {
+                    value.updatePosition()
+                }
             }
         })
         // delete enemy
@@ -116,34 +195,133 @@ function createGame() {
             enemies.splice(value, 1)
         })
     }
+    // check collision with player
+    var checkEnemyCollideWithPlayer = function (enemy) {
+        if (!enemy.isVanish() && !isGameOver) {
+            var disX = enemy.getx() - player.getx()
+            var disY = enemy.gety() - player.gety()
+            if (disX >= -30 && disX <= 30 && disY <= 30 && disY >= -20) {
+                // create explodes
+                createExplodeAtPosition(enemy.getx() + 16, enemy.gety() + 16)
+                createExplodeAtPosition(player.getx() + 14, enemy.gety() + 10)
+                isGameOver = true
+                player.die()
+                return true
+            }
+        }
+        return false
+    }
+    // update enemy bullet
+    var updateEnemyBullet = function () {
+        var temp = new Array()
+        enemyBullets.forEach(function (value, index) {
+            if (value.isVanish()) {
+                temp.push(index)
+            } else {
+                // check collision with player
+                if (checkBulletCollideWithPlayer(value)) {
+                    temp.push(index)
+                } else {
+                    value.updatePosition()
+                }
+            }
+        })
+        // delete enemy
+        temp.forEach(function (value) {
+            field.removeChild(enemyBullets[value].getImg())
+            enemyBullets.splice(value, 1)
+        })
+    }
+    var checkBulletCollideWithPlayer = function (bullet) {
+        if (!bullet.isVanish() && !isGameOver) {
+            var disX = bullet.getx() - player.getx()
+            var disY = bullet.gety() - player.gety()
+            if (disX >= -9 && disX <= 28 && disY <= 21 && disY >= -9) {
+                // create explodes
+                createExplodeAtPosition(player.getx() + 14, player.gety() + 10)
+                isGameOver = true
+                player.die()
+                return true
+            }
+        }
+        return false
+    }
     // update explode state
     var updateExplode = function () {
         var temp = new Array()
         explodes.forEach(function (value, index) {
-            if(value.isFinished()){
+            if (value.isFinished()) {
                 temp.push(index)
-            }else {
+            } else {
                 value.updateState()
             }
         })
         temp.forEach(function (value) {
             field.removeChild(explodes[value].img)
-            explodes.splice(value,1)
+            explodes.splice(value, 1)
         })
+    }
+    // interval for player launching bullets
+    var setBulletInterval = function () {
+        bulletInterval = setInterval(function () {
+            var bullet = createBullet(player)
+            bullets.push(bullet)
+            field.appendChild(bullet.getImg())
+        }, 300)
     }
     // interval for enemy emerge
     var setEnemyInterval = function (time) {
         enemyInterval = setInterval(function () {
             var num = levelParam.enemyNum - enemies.length
             if (num > 0) {
-                var enemy = createEnemy(field, player)
+                var enemy = createEnemy(field, level, player)
                 field.appendChild(enemy.img())
                 enemies.push(enemy)
             }
         }, time)
     }
+    // interval for enemy bullet
+    var setEnemyBulletInterval = function () {
+        enemyBulletInterval = setInterval(function () {
+            enemies.forEach(function (value) {
+                if (!value.isVanish()) {
+                    var bullet = createEnemyBullet(value, field, level, player)
+                    enemyBullets.push(bullet)
+                    field.appendChild(bullet.getImg())
+                }
+            })
+        }, 1500)
+    }
+    var createExplodeAtPosition = function (x, y) {
+        var explode = createExplode(x, y)
+        field.appendChild(explode.img)
+        explodes.push(explode)
+    }
     var bindEvent = function () {
         bindKeyEvent()
+        bindPlayAgain()
+    }
+    var bindPlayAgain = function () {
+        var playAgain = document.getElementById("playAgain")
+        playAgain.onclick = function (ev) {
+            document.getElementById("gameOver").style.display = "none"
+            clearField()
+            init()
+        }
+    }
+    var clearField = function () {
+        bullets.forEach(function (value) {
+            field.removeChild(value.getImg())
+        })
+        bullets = new Array()
+        enemies.forEach(function (value) {
+            field.removeChild(value.img())
+        })
+        enemies = new Array()
+        enemyBullets.forEach(function (value) {
+            field.removeChild(value.getImg())
+        })
+        enemyBullets = new Array()
     }
     var bindKeyEvent = function () {
         // bind key event to control the player
